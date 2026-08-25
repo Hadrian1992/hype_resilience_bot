@@ -148,11 +148,11 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
 
             for log in logs.into_iter() {
                 // parse amount from data (32 bytes)
-                let amount_wei: U256 = match log.data.0.as_slice() {
-                    data if data.len() >= 32 => {
-                        U256::from_big_endian(&data[data.len()-32..])
-                    }
-                    _ => U256::zero(),
+                let raw_data: &[u8] = log.data.as_ref();
+                let amount_wei: U256 = if raw_data.len() >= 32 {
+                    U256::from_big_endian(&raw_data[raw_data.len() - 32..])
+                } else {
+                    U256::zero()
                 };
                 let amount_f64 = if amount_wei.is_zero() {
                     0.0

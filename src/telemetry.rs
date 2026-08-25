@@ -65,11 +65,15 @@ pub async fn run_metrics_server(
                     let encoder = TextEncoder::new();
                     let metric_families = reg.gather();
                     let mut buffer = Vec::new();
-                    encoder.encode(&metric_families, &mut buffer).unwrap();
-                    Ok::<_, Infallible>(Response::builder()
+                    encoder
+                        .encode(&metric_families, &mut buffer)
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                    let response = Response::builder()
                         .status(200)
                         .header("Content-Type", encoder.format_type())
-                        .body(Body::from(buffer))?)
+                        .body(Body::from(buffer))
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                    Ok::<_, Box<dyn std::error::Error + Send + Sync>>(response)
                 }
             }))
         }

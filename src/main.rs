@@ -1,4 +1,4 @@
-use hype_resilience_bot::config::BotConfig;
+use crate::config::BotConfig;
 use tokio::sync::mpsc;
 
 mod brain;
