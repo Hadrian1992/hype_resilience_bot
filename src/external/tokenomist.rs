@@ -128,8 +128,8 @@ mod tests {
 
         let first = client.fetch_unlock_schedule(&url).await.expect("first fetch");
         assert_eq!(first.len(), 1);
-        // second call should hit cache; stop the server to ensure cache used
-        server.stop_async().await;
+        // Second call must be served from the in-memory cache; if it hit the
+        // HTTP server again, the assert_hits(1) below would fail.
         let second = client.fetch_unlock_schedule(&url).await.expect("second fetch");
         assert_eq!(second.len(), 1);
         m.assert_hits(1);

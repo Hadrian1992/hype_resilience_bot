@@ -186,7 +186,7 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
                 window_sum += amount_f64;
 
                 // evict old
-                while let Some((t, amt)) = window.front() {
+                while let Some((t, _amt)) = window.front() {
                     if *t + window_seconds < ts_secs {
                         let (_t, a) = window.pop_front().unwrap();
                         window_sum -= a;

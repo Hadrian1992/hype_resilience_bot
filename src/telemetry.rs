@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
