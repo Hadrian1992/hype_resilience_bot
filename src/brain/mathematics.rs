@@ -213,10 +213,12 @@ mod tests {
         assert_eq!(tw.count(), 3);
         assert!((tw.vwap() - 14.5).abs() < 1e-9);
 
-        // evict everything older than 24h
+        // eviction at t=87_501 (window 24h): trades @1000/@1100 expire, but the
+        // vesting flow @1200 (50 USD, still inside the window) remains
         tw.push(1_000 + 86_400 + 1, 1.0, 1.0);
-        assert!((tw.volume() - 1.0).abs() < 1e-9);
+        assert!((tw.volume() - 51.0).abs() < 1e-9); // 1 + leftover 50 USD vesting
         assert!((tw.vwap() - 1.0).abs() < 1e-9);
+        assert_eq!(tw.count(), 2);
     }
 }
 
