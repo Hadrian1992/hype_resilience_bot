@@ -33,7 +33,23 @@ message L2BookUpdate {
   repeated Level asks = 5;
 }
 
+// Executed trade on the venue.
+message Trade {
+  string coin = 1;
+  string px = 2;
+  string sz = 3;
+  int64 time = 4;
+  string side = 5;
+  string tid = 6;
+}
+
+// Subscription request for the public trades stream.
+message AllTradesRequest {
+  string coin = 1;
+}
+
 service OrderBookStreaming {
   rpc StreamL2Book(L2BookRequest) returns (stream L2BookUpdate) {}
+  rpc StreamTrades(AllTradesRequest) returns (stream Trade) {}
 }
 

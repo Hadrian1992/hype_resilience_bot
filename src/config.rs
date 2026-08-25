@@ -1,6 +1,19 @@
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, fs, path::Path};
 
+fn default_tokenomist_poll_secs() -> u64 {
+    900
+}
+fn default_ws_fallback_after_failures() -> u32 {
+    5
+}
+fn default_signal_horizon_secs() -> u64 {
+    1800
+}
+fn default_signal_validate_drop_pct() -> f64 {
+    0.005
+}
+
 /// Konfiguracja pojedynczego aktywa/monety
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetConfig {
@@ -32,6 +45,19 @@ pub struct BotConfig {
     pub poll_interval_seconds: u64,// poll interval dla eth_getLogs
     // Telegram
     pub telegram: Option<TelegramConfig>,
+    // Intelligence / observability
+    #[serde(default)]
+    pub tokenomist_url: Option<String>,
+    #[serde(default = "default_tokenomist_poll_secs")]
+    pub tokenomist_poll_secs: u64,
+    #[serde(default)]
+    pub ws_fallback_url: Option<String>,
+    #[serde(default = "default_ws_fallback_after_failures")]
+    pub ws_fallback_after_failures: u32,
+    #[serde(default = "default_signal_horizon_secs")]
+    pub signal_horizon_secs: u64,
+    #[serde(default = "default_signal_validate_drop_pct")]
+    pub signal_validate_drop_pct: f64,
 }
 
 impl Default for BotConfig {
@@ -45,6 +71,12 @@ impl Default for BotConfig {
             window_hours: 6,
             poll_interval_seconds: 60,
             telegram: None,
+            tokenomist_url: None,
+            tokenomist_poll_secs: 900,
+            ws_fallback_url: None,
+            ws_fallback_after_failures: 5,
+            signal_horizon_secs: 1800,
+            signal_validate_drop_pct: 0.005,
         }
     }
 }
@@ -115,6 +147,14 @@ impl BotConfig {
                 bot_token: bot,
                 chat_id: chat,
             });
+        }
+
+        // Intelligence / observability overrides
+        if let Ok(v) = env::var("TOKENOMIST_URL") {
+            self.tokenomist_url = if v.trim().is_empty() { None } else { Some(v) };
+        }
+        if let Ok(v) = env::var("WS_FALLBACK_URL") {
+            self.ws_fallback_url = if v.trim().is_empty() { None } else { Some(v) };
         }
     }
 

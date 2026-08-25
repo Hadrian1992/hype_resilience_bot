@@ -45,7 +45,7 @@
         "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
       },
       "targets": [
-        { "refId": "A", "expr": "depth_usd", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        { "refId": "A", "expr": "depth_usd", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     },
     {
@@ -87,7 +87,7 @@
         "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
       },
       "targets": [
-        { "refId": "A", "expr": "risk_state", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        { "refId": "A", "expr": "risk_state", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     },
     {
@@ -118,13 +118,13 @@
         "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
       },
       "targets": [
-        { "refId": "A", "expr": "volume_24h", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        { "refId": "A", "expr": "volume_24h", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     },
     {
       "id": 4,
       "type": "stat",
-      "title": "Messages Received (total)",
+      "title": "Open Paper Signals",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
       "fieldConfig": {
@@ -133,7 +133,11 @@
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [ { "color": "purple", "value": null } ]
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
           }
         },
         "overrides": []
@@ -147,7 +151,7 @@
         "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
       },
       "targets": [
-        { "refId": "A", "expr": "messages_received", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        { "refId": "A", "expr": "open_signals", "legendFormat": "open", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     },
     {
@@ -165,7 +169,7 @@
       },
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
       "targets": [
-        { "refId": "A", "expr": "volume_24h", "legendFormat": "volume_24h", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        { "refId": "A", "expr": "volume_24h", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     },
     {
@@ -188,11 +192,56 @@
       ]
     },
     {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Order-book imbalance (+/-2%)",
+      "description": "(bid-ask)/(bid+ask) notional in band; >0 buy pressure, <0 sell pressure",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "min": -1,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "expr": "imbalance", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Depth anomaly z-score (EWMA)",
+      "description": "|z| > 3 flags anomalous depth readings",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "expr": "anomaly_depth_z", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
       "id": 7,
       "type": "timeseries",
       "title": "Stability: reconnects & RPC errors (5m window)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 21 },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
@@ -204,6 +253,113 @@
       "targets": [
         { "refId": "A", "expr": "increase(reconnects[5m])", "legendFormat": "gRPC reconnects", "datasource": { "type": "prometheus", "uid": "prometheus" } },
         { "refId": "B", "expr": "increase(rpc_errors[5m])", "legendFormat": "RPC errors", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "VWAP 24h",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [
+        { "refId": "A", "expr": "vwap_24h", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Trade count (trailing 24h)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "expr": "trades_count_24h", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Pending unlock USD (next 7d)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [
+        { "refId": "A", "expr": "pending_unlock_usd", "legendFormat": "{{asset}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Paper signals closed (30m bars)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 50, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(paper_signals_total{result=\"validated\"}[30m]))", "legendFormat": "validated (HIT)", "datasource": { "type": "prometheus", "uid": "prometheus" } },
+        { "refId": "B", "expr": "sum(increase(paper_signals_total{result=\"invalidated\"}[30m]))", "legendFormat": "invalidated (MISS)", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Signal hit-rate (24h)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 45 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "green", "value": 60 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto",
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" }
+      },
+      "targets": [
+        { "refId": "A", "expr": "100 * sum(increase(paper_signals_total{result=\"validated\"}[24h])) / clamp_min(sum(increase(paper_signals_total{result=~\"validated|invalidated\"}[24h])), 1e-9)", "legendFormat": "hit-rate", "datasource": { "type": "prometheus", "uid": "prometheus" } }
       ]
     }
   ]

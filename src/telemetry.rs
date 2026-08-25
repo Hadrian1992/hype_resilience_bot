@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use once_cell::sync::Lazy;
-use prometheus::{Encoder, Gauge, IntCounter, Registry, TextEncoder};
+use prometheus::{Encoder, Gauge, GaugeVec, IntCounter, IntCounterVec, Registry, TextEncoder};
 use tracing_subscriber::EnvFilter;
 
 static MET_REGISTRY: Lazy<Registry> = Lazy::new(|| Registry::new());
@@ -28,18 +28,88 @@ static RPC_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     MET_REGISTRY.register(Box::new(c.clone())).ok();
     c
 });
-static DEPTH_USD: Lazy<Gauge> = Lazy::new(|| {
-    let g = Gauge::new("depth_usd", "Orderbook depth in USD").unwrap();
+
+// ---- per-asset metrics (label: asset) ----
+static DEPTH_USD: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("depth_usd", "Bid depth in USD within 2% band"),
+        &["asset"],
+    )
+    .unwrap();
     MET_REGISTRY.register(Box::new(g.clone())).ok();
     g
 });
-static VOLUME_24H: Lazy<Gauge> = Lazy::new(|| {
-    let g = Gauge::new("volume_24h", "24h rolling volume in USD").unwrap();
+static IMBALANCE: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("imbalance", "Order-book imbalance in 2% band [-1..1]"),
+        &["asset"],
+    )
+    .unwrap();
     MET_REGISTRY.register(Box::new(g.clone())).ok();
     g
 });
-static RISK_STATE: Lazy<Gauge> = Lazy::new(|| {
-    let g = Gauge::new("risk_state", "Current risk state (0=OK,1=WARN,2=CRITICAL)").unwrap();
+static RISK_STATE: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("risk_state", "Risk state (0=OK,1=WARN,2=CRITICAL)"),
+        &["asset"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static VOLUME_24H: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("volume_24h", "Trailing 24h traded volume USD"),
+        &["asset"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static VWAP_24H: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(prometheus::Opts::new("vwap_24h", "Trailing 24h VWAP"), &["asset"])
+        .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static TRADES_24H: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("trades_count_24h", "Trade count in trailing 24h"),
+        &["asset"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static PENDING_UNLOCK_USD: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("pending_unlock_usd", "Next upcoming unlock priced in USD"),
+        &["asset"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static ANOMALY_DEPTH_Z: Lazy<GaugeVec> = Lazy::new(|| {
+    let g = GaugeVec::new(
+        prometheus::Opts::new("anomaly_depth_z", "EWMA z-score of latest depth reading"),
+        &["asset"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(g.clone())).ok();
+    g
+});
+static PAPER_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
+    let c = IntCounterVec::new(
+        prometheus::Opts::new("paper_signals_total", "Paper signals by kind/result"),
+        &["kind", "result"],
+    )
+    .unwrap();
+    MET_REGISTRY.register(Box::new(c.clone())).ok();
+    c
+});
+static OPEN_SIGNALS: Lazy<Gauge> = Lazy::new(|| {
+    let g = Gauge::new("open_signals", "Currently open paper signals").unwrap();
     MET_REGISTRY.register(Box::new(g.clone())).ok();
     g
 });
@@ -97,12 +167,45 @@ pub fn inc_reconnects() {
 pub fn inc_rpc_errors() {
     RPC_ERRORS.inc();
 }
-pub fn set_depth_usd(v: f64) {
-    DEPTH_USD.set(v);
+#[allow(dead_code)]
+pub fn set_depth_usd(asset: &str, v: f64) {
+    DEPTH_USD.with_label_values(&[asset]).set(v);
 }
-pub fn set_volume_24h(v: f64) {
-    VOLUME_24H.set(v);
+#[allow(dead_code)]
+pub fn set_imbalance(asset: &str, v: f64) {
+    IMBALANCE.with_label_values(&[asset]).set(v);
 }
-pub fn set_risk_state(s: u8) {
-    RISK_STATE.set(s as f64);
+#[allow(dead_code)]
+pub fn set_risk_state(asset: &str, code: u8) {
+    RISK_STATE.with_label_values(&[asset]).set(code as f64);
+}
+#[allow(dead_code)]
+pub fn set_volume_24h(asset: &str, v: f64) {
+    VOLUME_24H.with_label_values(&[asset]).set(v);
+}
+#[allow(dead_code)]
+pub fn set_vwap_24h(asset: &str, v: f64) {
+    VWAP_24H.with_label_values(&[asset]).set(v);
+}
+#[allow(dead_code)]
+pub fn set_trades_count_24h(asset: &str, n: usize) {
+    TRADES_24H.with_label_values(&[asset]).set(n as f64);
+}
+#[allow(dead_code)]
+pub fn set_pending_unlock_usd(asset: &str, v: f64) {
+    PENDING_UNLOCK_USD.with_label_values(&[asset]).set(v);
+}
+#[allow(dead_code)]
+pub fn set_anomaly_z(asset: &str, z: Option<f64>) {
+    ANOMALY_DEPTH_Z
+        .with_label_values(&[asset])
+        .set(z.unwrap_or(0.0));
+}
+#[allow(dead_code)]
+pub fn inc_paper_signal(kind: &str, result: &str) {
+    PAPER_SIGNALS.with_label_values(&[kind, result]).inc();
+}
+#[allow(dead_code)]
+pub fn set_open_signals(n: usize) {
+    OPEN_SIGNALS.set(n as f64);
 }

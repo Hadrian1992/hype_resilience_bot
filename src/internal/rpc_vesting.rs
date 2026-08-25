@@ -74,14 +74,18 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
     };
 
     // Parse vesting addresses
-    let mut vesting_addresses: Vec<Address> = Vec::new();
+    let mut vesting_map: Vec<(Address, String)> = Vec::new();
     for a in cfg.tracked_assets.iter() {
         if let Ok(addr) = Address::from_str(&a.vesting_contract) {
-            vesting_addresses.push(addr);
+            vesting_map.push((addr, a.symbol.to_uppercase()));
         } else {
-            warn!("rpc_vesting: skipping invalid vesting address for {}: {}", a.symbol, a.vesting_contract);
+            warn!(
+                "rpc_vesting: skipping invalid vesting address for {}: {}",
+                a.symbol, a.vesting_contract
+            );
         }
     }
+    let vesting_addresses: Vec<Address> = vesting_map.iter().map(|(a, _)| *a).collect();
 
     // Topic0 = Transfer(address,address,uint256)
     let topic0: H256 = H256::from_slice(ethers::utils::keccak256(b"Transfer(address,address,uint256)").as_slice());
@@ -195,9 +199,23 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
                     }
                 }
 
+                let from_addr = log
+                    .topics
+                    .get(1)
+                    .map(|tp| Address::from_slice(&tp.as_bytes()[12..]));
+                let sym = from_addr
+                    .and_then(|fa| {
+                        vesting_map
+                            .iter()
+                            .find(|(va, _)| *va == fa)
+                            .map(|(_, s)| s.clone())
+                    })
+                    .unwrap_or_default();
+
                 // build event json
                 let parsed = json!({
                     "type": "vesting_transfer",
+                    "symbol": sym,
                     "from": log.topics.get(1).map(|t| format!("0x{}", hex::encode(&t.as_bytes()[12..]))),
                     "to": log.topics.get(2).map(|t| format!("0x{}", hex::encode(&t.as_bytes()[12..]))),
                     "amount": amount_f64,

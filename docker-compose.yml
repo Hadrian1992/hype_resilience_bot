@@ -7,6 +7,8 @@ services:
       - GRPC_URL=${GRPC_URL:-https://your-grpc-endpoint}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TOKENOMIST_URL=${TOKENOMIST_URL:-}
+      - WS_FALLBACK_URL=${WS_FALLBACK_URL:-wss://api.hyperliquid.xyz/ws}
       - METRICS_ADDR=0.0.0.0:9898
     ports:
       - "9898:9898"

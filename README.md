@@ -34,3 +34,26 @@ After startup:
 The dashboard **"HYPE Resilience Bot"** (folder `HYPE`) is provisioned automatically:
 bid depth, risk-state gauge, 24h volume estimate, message flow and stability panels.
 
+## What's inside
+
+- **Faza 1** – real trades stream (24h volume + VWAP + trade count), order-book
+  imbalance (±2%), Tokenomist unlock schedule wired into the brain,
+  multi-asset support (per-asset risk manager, metrics labelled by `asset`)
+- **Faza 2** – paper signals (`WARN`, `CRITICAL`, `WHALE`, `ANOMALY`) graded
+  automatically against realized price action over a configurable horizon
+- **Faza 3** – signals persisted to `state/signals.jsonl` + offline replay summary
+- **Faza 4** – EWMA anomaly detection on depth (`anomaly_depth_z`) and automatic
+  WebSocket fallback (`wss://api.hyperliquid.xyz/ws`) after repeated gRPC failures
+
+## Paper-signal replay
+
+```powershell
+cargo run --release -- --replay          # or: docker compose run --rm bot --replay
+```
+
+Prints overall and per-kind hit rates of closed paper signals.
+
+Extra environment variables: `TOKENOMIST_URL` (optional, enables the
+`pending_unlock_usd` metric) and `WS_FALLBACK_URL`.
+
+

@@ -18,15 +18,35 @@ const HEARTBEAT_TIMEOUT_SECS: u64 = 5;
 
 pub async fn start_grpc_orderbook_stream(cfg: BotConfig, tx: Sender<Value>) {
     let mut backoff_secs = 1u64;
+    let mut consecutive_failures = 0u32;
     loop {
         match run_stream(&cfg, tx.clone()).await {
             Ok(_) => {
                 info!("grpc_orderbook: stream ended gracefully");
                 backoff_secs = 1;
+                consecutive_failures = 0;
             }
             Err(e) => {
                 error!("grpc_orderbook: stream error: {}", e);
                 telemetry::inc_reconnects();
+                consecutive_failures += 1;
+
+                // Faza 4: po N nieudanych próbach przełącz się na publiczny WS
+                if cfg.ws_fallback_after_failures > 0
+                    && consecutive_failures >= cfg.ws_fallback_after_failures
+                    && cfg.ws_fallback_url.is_some()
+                {
+                    warn!(
+                        "grpc_orderbook: {} consecutive failures - entering websocket fallback",
+                        consecutive_failures
+                    );
+                    if let Err(we) = super::ws_fallback::run_until_error(&cfg, tx.clone()).await {
+                        warn!("ws_fallback session ended: {}", we);
+                    }
+                    warn!("returning to gRPC transport");
+                    consecutive_failures = 0;
+                }
+
                 // exponential backoff with cap
                 tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
                 backoff_secs = (backoff_secs * 2).min(60);
