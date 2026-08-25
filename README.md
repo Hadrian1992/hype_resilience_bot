@@ -28,7 +28,7 @@ After startup:
 | Service   | URL                            | Notes                                   |
 |-----------|--------------------------------|-----------------------------------------|
 | Bot       | http://localhost:9898/metrics  | raw Prometheus metrics                  |
-| Prometheus| http://localhost:9090          | scrapes the bot every 15 s              |
+| Prometheus| http://localhost:9090          | scrapes the bot every 5 s               |
 | Grafana   | http://localhost:3000          | user `admin`, password from `GRAFANA_PASSWORD` |
 
 The dashboard **"HYPE Resilience Bot"** (folder `HYPE`) is provisioned automatically:

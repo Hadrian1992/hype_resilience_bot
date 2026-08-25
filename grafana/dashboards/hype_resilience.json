@@ -3,7 +3,7 @@
   "editable": true,
   "graphTooltip": 1,
   "links": [],
-  "refresh": "10s",
+  "refresh": "5s",
   "schemaVersion": 39,
   "tags": ["hype", "resilience"],
   "templating": { "list": [] },
