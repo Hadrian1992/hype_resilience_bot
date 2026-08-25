@@ -112,7 +112,7 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
     let mut backoff_base_secs: u64 = 1;
 
     loop {
-        let res = (|| async {
+        let res = async {
             // determine latest block
             let latest_bn = provider.get_block_number().await?;
             let latest = latest_bn.as_u64();
@@ -172,14 +172,10 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
 
                 // get block timestamp
                 let ts_secs = if let Some(bn) = log.block_number {
-                    if let Ok(Some(block)) = provider.get_block(bn).await.map(|b| b) {
-                        if let Some(ts) = block.timestamp.as_u64().checked_into() {
-                            block.timestamp.as_u64()
-                        } else {
-                            // fallback to now
-                            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
-                        }
+                    if let Ok(Some(block)) = provider.get_block(bn).await {
+                        block.timestamp.as_u64()
                     } else {
+                        // fallback to now
                         SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
                     }
                 } else {

@@ -79,63 +79,64 @@ async fn run_stream(cfg: &BotConfig, tx: Sender<Value>) -> Result<(), Box<dyn st
         });
     }
 
-    // spawn watchdog to check heartbeat
-    {
-        let last_msg_cloned = last_msg.clone();
-        let client_clone = client.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_secs(HEARTBEAT_TIMEOUT_SECS)).await;
-                let elapsed = { last_msg_cloned.lock().await.elapsed() };
-                if elapsed.as_secs() > HEARTBEAT_TIMEOUT_SECS {
-                    warn!("grpc_orderbook: heartbeat timeout ({}s) - forcing reconnect", elapsed.as_secs());
-                    // dropping client will close connection; actual reconnect handled by outer loop
-                    let _ = client_clone.shutdown().await;
-                    return;
+    // process incoming stream with an in-loop heartbeat watchdog.
+    // On heartbeat timeout we return an error so the outer loop can reconnect
+    // (dropping the stream/client closes the underlying connection).
+    loop {
+        tokio::select! {
+            msg = stream.message() => {
+                let msg = match msg {
+                    Ok(Some(m)) => m,
+                    Ok(None) => break,
+                    Err(e) => return Err(e.into()),
+                };
+
+                // update heartbeat
+                {
+                    let mut lm = last_msg.lock().await;
+                    *lm = Instant::now();
+                }
+
+                // Build JSON payload
+                let mut bids = Vec::new();
+                for lvl in msg.bids.iter() {
+                    // parse price and size as strings in proto
+                    let px = lvl.px.parse::<f64>().unwrap_or(0.0);
+                    let sz = lvl.sz.parse::<f64>().unwrap_or(0.0);
+                    bids.push(serde_json::json!({"px": px, "sz": sz, "n": lvl.n}));
+                }
+                let mut asks = Vec::new();
+                for lvl in msg.asks.iter() {
+                    let px = lvl.px.parse::<f64>().unwrap_or(0.0);
+                    let sz = lvl.sz.parse::<f64>().unwrap_or(0.0);
+                    asks.push(serde_json::json!({"px": px, "sz": sz, "n": lvl.n}));
+                }
+
+                let payload = serde_json::json!({
+                    "coin": msg.coin,
+                    "time": msg.time,
+                    "block_number": msg.block_number,
+                    "bids": bids,
+                    "asks": asks,
+                });
+
+                // push into ring buffer (drop oldest if capacity exceeded)
+                {
+                    let mut guard = ring.lock().await;
+                    if guard.len() >= RING_CAPACITY {
+                        // drop oldest
+                        guard.pop_front();
+                    }
+                    guard.push_back(payload);
                 }
             }
-        });
-    }
-
-    // process incoming stream
-    while let Some(msg) = stream.message().await? {
-        // update heartbeat
-        {
-            let mut lm = last_msg.lock().await;
-            *lm = Instant::now();
-        }
-
-        // Build JSON payload
-        let mut bids = Vec::new();
-        for lvl in msg.bids.iter() {
-            // parse price and size as strings in proto
-            let px = lvl.px.parse::<f64>().unwrap_or(0.0);
-            let sz = lvl.sz.parse::<f64>().unwrap_or(0.0);
-            bids.push(serde_json::json!({"px": px, "sz": sz, "n": lvl.n}));
-        }
-        let mut asks = Vec::new();
-        for lvl in msg.asks.iter() {
-            let px = lvl.px.parse::<f64>().unwrap_or(0.0);
-            let sz = lvl.sz.parse::<f64>().unwrap_or(0.0);
-            asks.push(serde_json::json!({"px": px, "sz": sz, "n": lvl.n}));
-        }
-
-        let payload = serde_json::json!({
-            "coin": msg.coin,
-            "time": msg.time,
-            "block_number": msg.block_number,
-            "bids": bids,
-            "asks": asks,
-        });
-
-        // push into ring buffer (drop oldest if capacity exceeded)
-        {
-            let mut guard = ring.lock().await;
-            if guard.len() >= RING_CAPACITY {
-                // drop oldest
-                guard.pop_front();
+            _ = tokio::time::sleep(Duration::from_secs(HEARTBEAT_TIMEOUT_SECS)) => {
+                let elapsed = { last_msg.lock().await.elapsed() };
+                if elapsed.as_secs() >= HEARTBEAT_TIMEOUT_SECS {
+                    warn!("grpc_orderbook: heartbeat timeout ({}s) - forcing reconnect", elapsed.as_secs());
+                    return Err("heartbeat timeout".into());
+                }
             }
-            guard.push_back(payload);
         }
     }
 
