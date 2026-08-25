@@ -231,7 +231,7 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
             }
 
             Ok(()) as Result<(), ProviderError>
-        })
+        }
         .await;
 
         match res {
