@@ -89,10 +89,13 @@ impl VolumeWindow {
 }
 
 /// Rolling 24h window over EXECUTED TRADES: volume (USD), VWAP, trade count.
+/// Flows pushed with sz == 0 (e.g. vesting unlocks) count toward volume but
+/// are excluded from the VWAP numerator/denominator.
 pub struct TradeWindow {
-    entries: VecDeque<(u64, f64, f64)>, // (timestamp_secs, usd, size)
+    entries: VecDeque<(u64, f64, f64, bool)>, // (ts, usd, sz, trade_like)
     volume: f64,
-    size_sum: f64,
+    vwap_usd: f64,
+    vwap_sz: f64,
     window_seconds: u64,
 }
 
@@ -101,25 +104,32 @@ impl TradeWindow {
         Self {
             entries: VecDeque::new(),
             volume: 0.0,
-            size_sum: 0.0,
+            vwap_usd: 0.0,
+            vwap_sz: 0.0,
             window_seconds: hours * 3600,
         }
     }
 
-    /// sz may be 0.0 for non-trade flows (excluded from VWAP denominator).
     pub fn push(&mut self, timestamp_secs: u64, usd: f64, sz: f64) {
-        self.entries.push_back((timestamp_secs, usd, sz));
+        let trade_like = sz > 1e-12;
+        self.entries.push_back((timestamp_secs, usd, sz, trade_like));
         self.volume += usd;
-        self.size_sum += sz;
+        if trade_like {
+            self.vwap_usd += usd;
+            self.vwap_sz += sz;
+        }
         self.evict_old(timestamp_secs);
     }
 
     fn evict_old(&mut self, now_secs: u64) {
-        while let Some(&(t, u, s)) = self.entries.front() {
+        while let Some(&(t, u, s, like)) = self.entries.front() {
             if t + self.window_seconds < now_secs {
                 self.entries.pop_front();
                 self.volume -= u;
-                self.size_sum -= s;
+                if like {
+                    self.vwap_usd -= u;
+                    self.vwap_sz -= s;
+                }
             } else {
                 break;
             }
@@ -135,8 +145,8 @@ impl TradeWindow {
     }
 
     pub fn vwap(&self) -> f64 {
-        if self.size_sum > 1e-9 {
-            self.volume / self.size_sum
+        if self.vwap_sz > 1e-9 {
+            self.vwap_usd / self.vwap_sz
         } else {
             0.0
         }

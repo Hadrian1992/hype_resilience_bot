@@ -51,6 +51,11 @@ impl EwmaZ {
             None
         }
     }
+
+    /// Current EWMA mean (baseline of the latest observation).
+    pub fn mean(&self) -> f64 {
+        self.mean
+    }
 }
 
 /// Flags depth readings whose |z| exceeds the threshold.
@@ -60,6 +65,10 @@ pub struct DepthAnomalyDetector {
 }
 
 impl DepthAnomalyDetector {
+    /// Minimum relative deviation from baseline required ON TOP of the z-score,
+    /// so perfectly flat series don't flag microscopic moves as anomalies.
+    const MIN_REL_DEV: f64 = 0.02;
+
     pub fn new(threshold: f64) -> Self {
         Self {
             ewma: EwmaZ::new(0.05, 60),
@@ -70,7 +79,16 @@ impl DepthAnomalyDetector {
     /// Returns (z-score when warmed up, is_anomalous).
     pub fn update(&mut self, depth_usd: f64) -> (Option<f64>, bool) {
         match self.ewma.update(depth_usd) {
-            Some(z) => (Some(z), z.abs() > self.threshold),
+            Some(z) => {
+                let baseline = self.ewma.mean();
+                let rel_dev = if baseline.abs() > 1e-9 {
+                    (depth_usd - baseline).abs() / baseline.abs()
+                } else {
+                    f64::INFINITY
+                };
+                let anomalous = z.abs() > self.threshold && rel_dev > Self::MIN_REL_DEV;
+                (Some(z), anomalous)
+            }
             None => (None, false),
         }
     }
