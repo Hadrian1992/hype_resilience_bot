@@ -1,17 +1,28 @@
 use hype_resilience_bot::config::BotConfig;
 use tokio::sync::mpsc;
 
+mod brain;
 mod config;
+mod execution;
 mod external;
 mod internal;
-mod brain;
-mod execution;
+mod telemetry;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🦀 System uruchomiony. Alokacja wątków na rdzeniach procesora...");
 
     let cfg = BotConfig::load_from_file(Some("config.json"))?;
+
+    // Telemetria: logowanie strukturalne + serwer metryk Prometheus (/metrics)
+    telemetry::init_tracing();
+    let metrics_addr =
+        std::env::var("METRICS_ADDR").unwrap_or_else(|_| "0.0.0.0:9898".to_string());
+    tokio::spawn(async move {
+        if let Err(e) = telemetry::run_metrics_server(&metrics_addr).await {
+            eprintln!("metrics server stopped: {}", e);
+        }
+    });
 
     // Kanały komunikacji
     let (gielda_tx, mut gielda_rx) = mpsc::channel::<serde_json::Value>(1000);

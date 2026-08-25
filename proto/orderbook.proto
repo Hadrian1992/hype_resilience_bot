@@ -1,19 +1,39 @@
-// Placeholder: copy the real orderbook.proto from quiknode-labs/hypercore-grpc-examples
-// Put the canonical proto file at proto/orderbook.proto as instructed in the project spec.
-// Until you place the real proto, build will fail. Fetch from:
-// https://github.com/quiknode-labs/hypercore-grpc-examples
+// Orderbook gRPC definitions for Hyperliquid (hypercore) streaming.
+//
+// NOTE: This is a minimal, self-contained definition set matching the types
+// consumed by src/internal/grpc_orderbook.rs (package "hyperliquid").
+// If the canonical proto from quiknode-labs/hypercore-grpc-examples differs,
+// replace these definitions with it (keep the package name "hyperliquid").
 
 syntax = "proto3";
 
-package orderbook;
+package hyperliquid;
 
-// Minimal placeholder definitions to allow editors to show proto structure.
-// Replace with real definitions.
-message L2Book {
-  string symbol = 1;
-  repeated bytes data = 2;
+// Single orderbook price level.
+message Level {
+  string px = 1;
+  string sz = 2;
+  uint32 n = 3;
 }
 
-service StreamL2BookService {
-  rpc StreamL2Book(stream L2Book) returns (stream L2Book) {}
+// Subscription request for the L2 book stream.
+message L2BookRequest {
+  string coin = 1;
+  uint32 n_levels = 2;
+  optional uint32 n_sig_figs = 3;
+  optional int32 mantissa = 4;
 }
+
+// Snapshot of the L2 book pushed by the stream.
+message L2BookUpdate {
+  string coin = 1;
+  int64 time = 2;
+  int64 block_number = 3;
+  repeated Level bids = 4;
+  repeated Level asks = 5;
+}
+
+service OrderBookStreaming {
+  rpc StreamL2Book(L2BookRequest) returns (stream L2BookUpdate) {}
+}
+

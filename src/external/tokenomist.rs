@@ -40,7 +40,7 @@ impl TokenomistClient {
     pub async fn fetch_unlock_schedule(
         &self,
         api_url: &str,
-    ) -> Result<Vec<UnlockPlan>, reqwest::Error> {
+    ) -> Result<Vec<UnlockPlan>, Box<dyn std::error::Error + Send + Sync>> {
         // check cache
         {
             let guard = self.cache.read().await;
@@ -73,10 +73,7 @@ impl TokenomistClient {
                             Err(e) => {
                                 // JSON parse error
                                 if attempt >= max_attempts {
-                                    return Err(reqwest::Error::new(
-                                        reqwest::StatusCode::INTERNAL_SERVER_ERROR,
-                                        format!("json parse error: {}", e),
-                                    ));
+                                    return Err(format!("json parse error: {}", e).into());
                                 }
                                 // fallthrough to backoff
                             }
@@ -84,20 +81,20 @@ impl TokenomistClient {
                     } else if r.status().as_u16() == 429 {
                         // rate limited -> backoff
                         if attempt >= max_attempts {
-                            return Err(reqwest::Error::new(r.status(), "rate limited"));
+                            return Err(format!("rate limited: {}", r.status()).into());
                         }
                     } else if r.status().is_server_error() {
                         if attempt >= max_attempts {
-                            return Err(reqwest::Error::new(r.status(), "server error"));
+                            return Err(format!("server error: {}", r.status()).into());
                         }
                     } else {
                         // unexpected client error; don't retry
-                        return Err(reqwest::Error::new(r.status(), "unexpected status"));
+                        return Err(format!("unexpected status: {}", r.status()).into());
                     }
                 }
                 Err(e) => {
                     if attempt >= max_attempts {
-                        return Err(e);
+                        return Err(e.into());
                     }
                     // else fallthrough to retry
                 }
