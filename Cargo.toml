@@ -4,22 +4,36 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Silnik asynchroniczny i wielowątkowość na procesorze
+# Asynchronous runtime
 tokio = { version = "1.38", features = ["full"] }
 futures-util = "0.3"
-# Klient gRPC i obsługa plików .proto (wymagane przez quiknode-labs)
+
+# gRPC / protobuf
 tonic = { version = "0.11", features = ["tls", "gzip"] }
 prost = "0.12"
-zstd = "0.13" # Dekompresja danych w locie
-# Klient HTTP i integracja z Web3 (Alchemy RPC)
-alloy = { version = "0.1", features = ["providers", "rpc-types"] }
-reqwest = { version = "0.11", features = ["json"] }
-# Serializacja i parsowanie struktur JSON
+
+# Compression
+zstd = "0.13"
+
+# Ethereum client (ethers-rs)
+ethers = { version = "2.0", features = ["providers", "rustls"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# Silnik wskaźników i matematyki
+
+# Math / TA
 ta = "0.5"
 ndarray = "0.15"
+
+# Logging & telemetry
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+prometheus = "0.14"
+metrics-exporter-prometheus = "0.8"
 
 [build-dependencies]
 # Kompilator plików .proto do kodu w języku Rust
