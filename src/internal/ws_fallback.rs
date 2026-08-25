@@ -3,7 +3,7 @@
 //! JSON shape as grpc_orderbook so the brain stays unaware of the transport.
 
 use crate::config::BotConfig;
-use futures_util::SinkExt;
+use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
