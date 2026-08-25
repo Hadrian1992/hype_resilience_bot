@@ -1,7 +1,6 @@
 use crate::config::BotConfig;
 use ethers::prelude::*;
 use ethers::types::{Filter, Log, H256, Address, U256, BlockNumber};
-use rand::{thread_rng, Rng};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -243,9 +242,9 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
             }
             Err(e) => {
                 error!("rpc_vesting: provider error: {}", e);
-                // backoff with jitter
-                let mut rng = thread_rng();
-                let jitter: u64 = rng.gen_range(0..3);
+                // backoff with jitter (rand::random - ThreadRng is not Send and
+                // must not be held across an await inside a spawned task)
+                let jitter: u64 = rand::random::<u64>() % 3;
                 let wait = (backoff_base_secs + jitter).min(120);
                 warn!("rpc_vesting: backing off for {}s", wait);
                 sleep(Duration::from_secs(wait)).await;
