@@ -33,7 +33,10 @@ pub async fn start_grpc_orderbook_stream(cfg: BotConfig, tx: Sender<Value>) {
     }
 }
 
-async fn run_stream(cfg: &BotConfig, tx: Sender<Value>) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_stream(
+    cfg: &BotConfig,
+    tx: Sender<Value>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let uri = cfg.grpc_url.clone();
     info!("grpc_orderbook: connecting to {}", uri);
 
