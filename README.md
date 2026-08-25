@@ -15,3 +15,22 @@ Next steps:
 2. Implement the tonic gRPC client in src/internal/grpc_orderbook.rs using generated types.
 3. Implement the alloy-based eth_getLogs client in src/internal/rpc_vesting.rs.
 4. Fill mathematics and risk_manager with production logic.
+
+## Quick start (Docker Compose: bot + Prometheus + Grafana)
+
+```powershell
+Copy-Item .env.example .env   # then fill in your keys (never commit .env!)
+docker compose up --build
+```
+
+After startup:
+
+| Service   | URL                            | Notes                                   |
+|-----------|--------------------------------|-----------------------------------------|
+| Bot       | http://localhost:9898/metrics  | raw Prometheus metrics                  |
+| Prometheus| http://localhost:9090          | scrapes the bot every 15 s              |
+| Grafana   | http://localhost:3000          | user `admin`, password from `GRAFANA_PASSWORD` |
+
+The dashboard **"HYPE Resilience Bot"** (folder `HYPE`) is provisioned automatically:
+bid depth, risk-state gauge, 24h volume estimate, message flow and stability panels.
+

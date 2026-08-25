@@ -103,9 +103,13 @@ impl BotConfig {
                 self.poll_interval_seconds = parsed;
             }
         }
-        // Telegram vars (opcjonalne)
-        let bot = env::var("TELEGRAM_BOT_TOKEN").ok();
-        let chat = env::var("TELEGRAM_CHAT_ID").ok();
+        // Telegram vars (opcjonalne; puste stringi traktujemy jak brak)
+        let bot = env::var("TELEGRAM_BOT_TOKEN")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
+        let chat = env::var("TELEGRAM_CHAT_ID")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
         if bot.is_some() || chat.is_some() {
             self.telegram = Some(TelegramConfig {
                 bot_token: bot,

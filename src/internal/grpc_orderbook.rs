@@ -1,4 +1,5 @@
 use crate::config::BotConfig;
+use crate::telemetry;
 use serde_json::Value;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -25,6 +26,7 @@ pub async fn start_grpc_orderbook_stream(cfg: BotConfig, tx: Sender<Value>) {
             }
             Err(e) => {
                 error!("grpc_orderbook: stream error: {}", e);
+                telemetry::inc_reconnects();
                 // exponential backoff with cap
                 tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
                 backoff_secs = (backoff_secs * 2).min(60);
@@ -129,6 +131,7 @@ async fn run_stream(
                     if guard.len() >= RING_CAPACITY {
                         // drop oldest
                         guard.pop_front();
+                        telemetry::inc_messages_dropped();
                     }
                     guard.push_back(payload);
                 }

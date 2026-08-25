@@ -1,5 +1,8 @@
+use crate::brain::mathematics::{compute_bid_depth_usd, VolumeWindow};
+use crate::brain::risk_manager::{Action, CentralRiskManager, RiskConfig, RiskState};
 use crate::config::BotConfig;
 use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 
 mod brain;
 mod config;
@@ -40,22 +43,123 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         internal::rpc_vesting::start_rpc_vesting_monitor(rpc_cfg, blockchain_tx).await;
     });
 
-    // RDZEŃ 3: Główny Mózg Systemu (Konsument danych - CentralRiskManager)
+    // RDZEŃ 3: Główny Mózg Systemu (CentralRiskManager + metryki + alerty)
     tokio::spawn(async move {
+        let risk_cfg = RiskConfig {
+            depth_min_usd: 25_000.0,
+            unlock_ratio_warn: 0.10,
+            buyback_budget_ratio: 0.05,
+        };
+        let mut rm = CentralRiskManager::new(risk_cfg);
+        let mut volume = VolumeWindow::new(24);
+        let mut last_price = 0.0f64;
+        let mut last_depth = 0.0f64;
+        let mut pending_unlock_usd = 0.0f64;
+        let mut has_market_data = false;
+        let mut prev_state_code = 0u8;
+
         loop {
             tokio::select! {
-                Some(gielda_data) = gielda_rx.recv() => {
-                    // TODO: Aktualizacja lokalnego modelu płynności
-                    println!("[Giełda] got data: {}", gielda_data);
+                Some(book) = gielda_rx.recv() => {
+                    telemetry::inc_messages_received();
+
+                    // L2 book -> depth w USD (2% pod najlepszym bidem)
+                    let bids: Vec<(f64, f64)> = book["bids"]
+                        .as_array()
+                        .map(|levels| {
+                            levels
+                                .iter()
+                                .filter_map(|l| Some((l["px"].as_f64()?, l["sz"].as_f64()?)))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+
+                    if !bids.is_empty() {
+                        let best_bid = bids.iter().map(|(px, _)| *px).fold(f64::MIN, f64::max);
+                        if best_bid > 0.0 && best_bid.is_finite() {
+                            last_price = best_bid;
+                            last_depth = compute_bid_depth_usd(&bids, best_bid, 0.02);
+                            telemetry::set_depth_usd(last_depth);
+                            has_market_data = true;
+                        }
+                    }
                 }
-                Some(onchain_alert) = blockchain_rx.recv() => {
-                    // TODO: Wyzwolenie natychmiastowej kalkulacji ryzyka absorpcji
-                    println!("[Blockchain] got alert: {}", onchain_alert);
+                Some(event) = blockchain_rx.recv() => {
+                    telemetry::inc_messages_received();
+
+                    if event["type"].as_str() == Some("vesting_transfer") {
+                        let tokens = event["amount"].as_f64().unwrap_or(0.0);
+                        let usd = tokens * last_price;
+                        let now_secs = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        volume.push_trade(now_secs, usd);
+                        pending_unlock_usd =
+                            event["window_sum"].as_f64().unwrap_or(0.0) * last_price;
+                    }
                 }
                 else => {
-                    // No channels ready - sleep briefly
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    continue;
                 }
+            }
+
+            if !has_market_data {
+                continue;
+            }
+
+            // Ocena ryzyka + aktualizacja metryk
+            let volume_24h = volume.total_24h(None);
+            telemetry::set_volume_24h(volume_24h);
+
+            let (state, action) = rm.evaluate(volume_24h, last_depth, pending_unlock_usd);
+            let state_code = match state {
+                RiskState::Ok => 0u8,
+                RiskState::Warn => 1u8,
+                RiskState::Critical => 2u8,
+            };
+            telemetry::set_risk_state(state_code);
+
+            // Alerty tylko przy ZMIANIE stanu (bez spamu)
+            if state_code != prev_state_code {
+                info!(
+                    "risk state changed: {} -> {}",
+                    match prev_state_code {
+                        1 => "WARN",
+                        2 => "CRITICAL",
+                        _ => "OK",
+                    },
+                    match state_code {
+                        1 => "WARN",
+                        2 => "CRITICAL",
+                        _ => "OK",
+                    }
+                );
+                match action {
+                    Some(Action::AlertTelegram(text)) => {
+                        warn!("RISK ALERT: {}", text);
+                        if let Some(tg) = &cfg.telegram {
+                            if let (Some(token), Some(chat)) = (&tg.bot_token, &tg.chat_id) {
+                                let full = format!("[HYPE-RESILIENCE] {}", text);
+                                if let Err(e) =
+                                    execution::telegram::send_telegram_alert(token, chat, &full)
+                                        .await
+                                {
+                                    error!("failed to send telegram alert: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Some(Action::ThrottleBuyback { recommended_usd }) => {
+                        warn!(
+                            "risk WARN: recommended buyback throttle: ${:.2}",
+                            recommended_usd
+                        );
+                    }
+                    None => {}
+                }
+                prev_state_code = state_code;
             }
         }
     });

@@ -242,6 +242,7 @@ pub async fn start_rpc_vesting_monitor(cfg: BotConfig, tx: Sender<Value>) {
             }
             Err(e) => {
                 error!("rpc_vesting: provider error: {}", e);
+                crate::telemetry::inc_rpc_errors();
                 // backoff with jitter (rand::random - ThreadRng is not Send and
                 // must not be held across an await inside a spawned task)
                 let jitter: u64 = rand::random::<u64>() % 3;
