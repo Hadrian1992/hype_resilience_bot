@@ -25,6 +25,8 @@ jobs:
             ${{ runner.os }}-cargo-
       # NOTE: `cargo fmt -- --check` intentionally omitted for now -
       # the codebase is not rustfmt-clean yet (no local toolchain available).
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Build
         run: cargo build --release
       - name: Run tests
