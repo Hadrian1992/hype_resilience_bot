@@ -1,0 +1,19 @@
+// Placeholder: copy the real orderbook.proto from quiknode-labs/hypercore-grpc-examples
+// Put the canonical proto file at proto/orderbook.proto as instructed in the project spec.
+// Until you place the real proto, build will fail. Fetch from:
+// https://github.com/quiknode-labs/hypercore-grpc-examples
+
+syntax = "proto3";
+
+package orderbook;
+
+// Minimal placeholder definitions to allow editors to show proto structure.
+// Replace with real definitions.
+message L2Book {
+  string symbol = 1;
+  repeated bytes data = 2;
+}
+
+service StreamL2BookService {
+  rpc StreamL2Book(stream L2Book) returns (stream L2Book) {}
+}

@@ -1,0 +1,26 @@
+[package]
+name = "hype_resilience_bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Silnik asynchroniczny i wielowątkowość na procesorze
+tokio = { version = "1.38", features = ["full"] }
+futures-util = "0.3"
+# Klient gRPC i obsługa plików .proto (wymagane przez quiknode-labs)
+tonic = { version = "0.11", features = ["tls", "gzip"] }
+prost = "0.12"
+zstd = "0.13" # Dekompresja danych w locie
+# Klient HTTP i integracja z Web3 (Alchemy RPC)
+alloy = { version = "0.1", features = ["providers", "rpc-types"] }
+reqwest = { version = "0.11", features = ["json"] }
+# Serializacja i parsowanie struktur JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Silnik wskaźników i matematyki
+ta = "0.5"
+ndarray = "0.15"
+
+[build-dependencies]
+# Kompilator plików .proto do kodu w języku Rust
+tonic-build = "0.11"

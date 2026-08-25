@@ -1,0 +1,19 @@
+{
+  "rpc_url": "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
+  "grpc_url": "wss://api.hyperliquid.xyz/ws",
+  "hype_token_address": "0x1234567890abcdef1234567890abcdef12345678",
+  "tracked_assets": [
+    {
+      "symbol": "HYPE",
+      "vesting_contract": "0xabcdef0123456789abcdef0123456789abcdef01",
+      "threshold_usd": 100000.0
+    }
+  ],
+  "threshold_hype": 100000.0,
+  "window_hours": 6,
+  "poll_interval_seconds": 60,
+  "telegram": {
+    "bot_token": null,
+    "chat_id": null
+  }
+}
