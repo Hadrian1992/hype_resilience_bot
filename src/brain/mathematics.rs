@@ -213,12 +213,13 @@ mod tests {
         assert_eq!(tw.count(), 3);
         assert!((tw.vwap() - 14.5).abs() < 1e-9);
 
-        // eviction at t=87_501 (window 24h): trades @1000/@1100 expire, but the
-        // vesting flow @1200 (50 USD, still inside the window) remains
-        tw.push(1_000 + 86_400 + 1, 1.0, 1.0);
-        assert!((tw.volume() - 51.0).abs() < 1e-9); // 1 + leftover 50 USD vesting
+        // advance past the 24h horizon of ALL earlier flows (t = 87_601):
+        // trades @1000/@1100 and the vesting flow @1200 all expire;
+        // only the brand-new trade remains
+        tw.push(1_200 + 86_400 + 1, 1.0, 1.0); // t = 87_601
+        assert!((tw.volume() - 1.0).abs() < 1e-9);
         assert!((tw.vwap() - 1.0).abs() < 1e-9);
-        assert_eq!(tw.count(), 2);
+        assert_eq!(tw.count(), 1);
     }
 }
 
